@@ -1,0 +1,75 @@
+schema: spec-driven
+
+githubCopilot:
+  cloudAgent: true
+
+context: |
+  PortfolioVox es el repositorio del sitio principal de VoxMex, una marca
+  paraguas que presenta servicios, experiencia y productos digitales propios.
+  El contexto funcional y las decisiones confirmadas deben registrarse en
+  openspec/project-context.md.
+
+  Stack técnico comprobado:
+  - React 18 con TypeScript.
+  - Vite para desarrollo y build.
+  - ESLint para linting.
+  - CSS propio; no introducir una librería de estilos sin justificarla.
+
+  Estado actual:
+  - El repositorio parte de la plantilla mínima de Vite + React.
+  - El MVP inicial debe publicar el sitio principal de VoxMex en Netlify.
+  - VoxMex Viajes, VoxMex Games y VoxMex Store se presentan desde el sitio
+    principal y podrán vivir en subdominios independientes.
+  - No hay backend, persistencia, autenticación ni CMS confirmados.
+  - Google Analytics debe recuperarse o configurarse bajo control de VoxMex.
+
+  Reglas generales:
+  - Redactar los artefactos OpenSpec en español.
+  - Tratar project-context.md como fuente canónica de decisiones de producto.
+  - Marcar como pendiente cualquier decisión que no esté confirmada.
+  - No inventar contenido profesional, proyectos, clientes, métricas,
+    enlaces, datos de contacto o identidad visual.
+  - Walmart, Elsevier, Gobierno de México y CoralReef son experiencia real
+    autorizada; no atribuirles patrocinio, respaldo o afiliación actual.
+  - Mantener el alcance pequeño y trazable; no preparar funcionalidades
+    futuras que no formen parte del change aprobado.
+  - Priorizar responsive, accesibilidad, rendimiento y HTML semántico.
+  - Ejecutar npm run lint y npm run build antes de considerar completada
+    una tarea, salvo que el change documente por qué no aplican.
+  - Las traducciones deben vivir en archivos locales y consumirse mediante la
+    función t de la solución de internacionalización aprobada.
+
+rules:
+  proposal:
+    - Redacta en español.
+    - Explica objetivo, alcance, dependencias y fuera de alcance.
+    - Distingue decisiones confirmadas de supuestos y pendientes.
+    - No incluir detalles de implementación salvo cuando delimiten el alcance.
+
+  specs:
+    - Redacta comportamiento observable y verificable, no arquitectura.
+    - Usa escenarios WHEN/THEN/AND.
+    - No inventar contenido ni valores para datos pendientes.
+    - Mantener cada spec enfocada en una responsabilidad funcional clara.
+
+  design:
+    - Redacta en español.
+    - Define cómo implementar lo aprobado por proposal y specs.
+    - Justifica cualquier dependencia nueva.
+    - Mantén la solución compatible con React, TypeScript y Vite.
+    - No añadir una librería de internacionalización sin justificar su elección.
+
+  tasks:
+    - Redacta en español.
+    - Deriva cada tarea de las specs y del design aprobados.
+    - Incluye una validación concreta por tarea cuando sea posible.
+    - No introducir comportamiento nuevo durante la planificación.
+
+operations:
+  apply:
+    guidance:
+      - Implementa solo las tareas aprobadas y mantén los cambios acotados.
+      - Ejecuta npm run lint y npm run build al finalizar.
+  archive:
+    guidance:
+      - Resume la validación ejecutada y los pendientes conocidos.

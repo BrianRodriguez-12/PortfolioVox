@@ -1,0 +1,219 @@
+name: Archive OpenSpec change after merge
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: openspec-archive-main
+  cancel-in-progress: false
+
+jobs:
+  archive-change:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install OpenSpec CLI
+        run: npm install --global @fission-ai/openspec@1.12.0
+
+      - name: Detect the roadmap change included in the pull request
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t changes < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename' \
+              | sed -nE 's#^openspec/changes/(mvp1-[^/]+)/.*#\1#p' \
+              | sort -u
+          )
+
+          if [ "${#changes[@]}" -eq 0 ]; then
+            echo "No roadmap OpenSpec change was included; skipping archive."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${#changes[@]}" -ne 1 ]; then
+            echo "Expected exactly one roadmap change in the pull request; found: ${changes[*]}" >&2
+            exit 1
+          fi
+
+          change="${changes[0]}"
+          case "$change" in
+            mvp1-01-identidad-y-navegacion|mvp1-02-servicios|mvp1-03-experiencia-y-casos|mvp1-04-lineas-voxmex|mvp1-05-contacto-e-idiomas|mvp1-06-calidad-y-publicacion)
+              ;;
+            *)
+              echo "Unknown roadmap change ID: $change" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ ! -d "openspec/changes/$change" ]; then
+            echo "The active change directory openspec/changes/$change was not found on main." >&2
+            exit 1
+          fi
+
+          mapfile -t active_changes < <(
+            find openspec/changes -mindepth 1 -maxdepth 1 -type d ! -name archive -printf '%f\n' \
+              | sort
+          )
+          if [ "${#active_changes[@]}" -ne 1 ] || [ "${active_changes[0]}" != "$change" ]; then
+            echo "Expected $change to be the only active OpenSpec change; found: ${active_changes[*]}" >&2
+            exit 1
+          fi
+
+          echo "name=$change" >> "$GITHUB_OUTPUT"
+
+      - name: Validate change and require completed tasks
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          CHANGE_ID: ${{ steps.detect.outputs.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tasks_file="openspec/changes/$CHANGE_ID/tasks.md"
+          if [ ! -f "$tasks_file" ]; then
+            echo "Required tasks file is missing: $tasks_file" >&2
+            exit 1
+          fi
+          if ! grep -Eq '^[[:space:]]*[-*][[:space:]]+\[[xX ]\]' "$tasks_file"; then
+            echo "No task checklist was found in $tasks_file" >&2
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*[-*][[:space:]]+\[[[:space:]]\]' "$tasks_file"; then
+            echo "The change still has incomplete tasks:" >&2
+            grep -En '^[[:space:]]*[-*][[:space:]]+\[[[:space:]]\]' "$tasks_file" >&2
+            exit 1
+          fi
+
+          status_file="$RUNNER_TEMP/openspec-status.json"
+          openspec status --change "$CHANGE_ID" --json > "$status_file"
+          node - "$status_file" <<'NODE'
+          const fs = require('node:fs');
+          const status = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (!Array.isArray(status.artifacts) || status.artifacts.length === 0) {
+            throw new Error('OpenSpec returned no change artifacts to verify.');
+          }
+          const incomplete = status.artifacts.filter(
+            artifact => !['done', 'skipped'].includes(artifact.status),
+          );
+          if (incomplete.length > 0) {
+            throw new Error(`Incomplete OpenSpec artifacts: ${incomplete.map(item => item.id).join(', ')}`);
+          }
+          NODE
+
+          openspec validate "$CHANGE_ID" --json --no-interactive
+
+      - name: Verify roadmap row is not archived yet
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          CHANGE_ID: ${{ steps.detect.outputs.name }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const changeId = process.env.CHANGE_ID;
+          const lines = fs.readFileSync('openspec/roadmap-mvp1.md', 'utf8').split(/\r?\n/);
+          const matchingRows = lines
+            .map((line, index) => ({ line, index }))
+            .filter(({ line }) => line.startsWith('| ') && line.includes(`\`${changeId}\``));
+
+          if (matchingRows.length !== 1 || !matchingRows[0].line.endsWith('| [ ] |')) {
+            throw new Error(`Expected one unchecked roadmap row for ${changeId}.`);
+          }
+          NODE
+
+      - name: Synchronize specs and archive the change
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          CHANGE_ID: ${{ steps.detect.outputs.name }}
+        run: openspec archive "$CHANGE_ID" --yes --json
+
+      - name: Update roadmap after successful archive
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          CHANGE_ID: ${{ steps.detect.outputs.name }}
+        run: |
+          set -euo pipefail
+
+          if [ -d "openspec/changes/$CHANGE_ID" ]; then
+            echo "OpenSpec archive did not move the active change." >&2
+            exit 1
+          fi
+
+          shopt -s nullglob
+          archives=(openspec/changes/archive/*-"$CHANGE_ID")
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo "Expected one archived directory for $CHANGE_ID; found ${#archives[@]}." >&2
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const roadmapPath = 'openspec/roadmap-mvp1.md';
+          const changeId = process.env.CHANGE_ID;
+          const lines = fs.readFileSync(roadmapPath, 'utf8').split(/\r?\n/);
+          const matchingRows = lines
+            .map((line, index) => ({ line, index }))
+            .filter(({ line }) => line.startsWith('| ') && line.includes(`\`${changeId}\``));
+
+          if (matchingRows.length !== 1) {
+            throw new Error(`Expected one roadmap row for ${changeId}; found ${matchingRows.length}.`);
+          }
+
+          const { line, index } = matchingRows[0];
+          if (line.endsWith('| [x] |')) {
+            throw new Error(`The roadmap row for ${changeId} was marked before the archive completed.`);
+          }
+          if (!line.endsWith('| [ ] |')) {
+            throw new Error(`Roadmap row has an unexpected archive status: ${line}`);
+          }
+
+          lines[index] = line.replace(/\| \[ \] \|$/, '| [x] |');
+          fs.writeFileSync(roadmapPath, lines.join('\n'));
+          NODE
+
+      - name: Commit archive and roadmap update to main
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+          CHANGE_ID: ${{ steps.detect.outputs.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add openspec/specs openspec/changes openspec/roadmap-mvp1.md
+
+          if git diff --cached --quiet; then
+            echo "No OpenSpec archive or roadmap changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore(openspec): archive $CHANGE_ID"
+          git push origin "HEAD:$TARGET_BRANCH"
