@@ -51,6 +51,27 @@ When asked to work with OpenSpec, follow this pattern:
 3. **Follow instructions**: Run `openspec instructions [artifact] --change <name> --json` for the next artifact.
 4. **Validate before completing**: Run `openspec validate <name> --json`.
 
+## Branch Policy
+
+Every new OpenSpec proposal must be created on a dedicated branch. Before
+running `openspec new change <name>`:
+
+1. Derive the kebab-case change name and inspect `git status --short` and
+  `git branch --show-current`.
+2. For `main`, `master`, or an unrelated branch, create or switch to
+  `feat/<change-name>`.
+3. If unrelated uncommitted changes would be carried into the branch, stop and
+  ask whether they should be committed or stashed; never mix them silently.
+4. Verify the active branch, then create the OpenSpec change.
+
+OpenSpec does not create Git branches itself, so this check is mandatory in the
+agent workflow rather than a setting in `openspec/config.yaml`.
+
+The normative wording of this rule lives in `openspec/workflow-rules.md`, together
+with the other workflow rules shared by every agent integration. This section is a
+summary; when the two disagree, `openspec/workflow-rules.md` wins. Verify alignment
+across all integrations with `npm run verificar:reglas`.
+
 ## Creating New Changes
 
 When the user wants to propose a new change:
@@ -65,6 +86,7 @@ When the user wants to propose a new change:
 - `openspec/` — Root OpenSpec directory
 - `openspec/changes/` — Active changes with their artifacts
 - `openspec/config.yaml` — Project configuration
+- `openspec/workflow-rules.md` — Workflow rules shared by all agent integrations
 
 ## Best Practices
 

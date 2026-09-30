@@ -9,6 +9,10 @@ context: |
   El contexto funcional y las decisiones confirmadas deben registrarse en
   openspec/project-context.md.
 
+  Las reglas de proceso compartidas por todos los agentes —incluida la
+  política de rama para crear proposals— se encuentran en:
+  openspec/workflow-rules.md
+
   Stack técnico comprobado:
   - React 18 con TypeScript.
   - Vite para desarrollo y build.
@@ -33,6 +37,10 @@ context: |
     autorizada; no atribuirles patrocinio, respaldo o afiliación actual.
   - Mantener el alcance pequeño y trazable; no preparar funcionalidades
     futuras que no formen parte del change aprobado.
+  - Cada proposal se crea en su propia rama feat/<change-name>, nunca en la
+    rama por defecto ni mezclando trabajo ajeno. La regla completa, que
+    aplica a todos los agentes y a todas las integraciones, está en
+    openspec/workflow-rules.md y se comprueba con npm run verificar:reglas.
   - Priorizar responsive, accesibilidad, rendimiento y HTML semántico.
   - Ejecutar npm run lint y npm run build antes de considerar completada
     una tarea, salvo que el change documente por qué no aplican.

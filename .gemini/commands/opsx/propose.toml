@@ -15,6 +15,26 @@ I'll create a change with the artifacts your schema defines. With the default sp
 
 When the user is ready to implement, they must start the apply workflow explicitly.
 
+**Branch policy (required before creating the change)**
+
+Every proposal must live in a dedicated Git branch. Before running
+`openspec new change`:
+
+1. Derive the kebab-case change name from the user's input.
+2. Run `git status --short` and `git branch --show-current`.
+3. If the current branch is `main`, `master`, or another branch unrelated to
+   this change, switch to `feat/<change-name>`. Create it from the current
+   branch when it does not exist; reuse it when it already exists.
+4. If the working tree is dirty with changes unrelated to this change, stop and
+   ask the user whether to commit or stash them before switching. Do not create
+   planning artifacts on the default branch or mix unrelated work silently.
+5. Verify the resulting branch with `git branch --show-current`, then run
+   `openspec new change`.
+
+This workflow is planning-only, but the branch switch is part of preparing the
+change and must happen before any proposal, spec, design, or task file is
+created.
+
 ---
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `schemas`, `view`). Once selected, treat `--store <id>` as sticky for the rest of the workflow. Every unscoped example of those commands below is shorthand: before running it, append the flag. For example, run `openspec status --change "<name>" --json --store "<id>"`, not the unscoped form shown below. Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
