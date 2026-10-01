@@ -49,6 +49,18 @@ const RESUMENES = [
   },
 ];
 
+/**
+ * Regla que vive en la Action de archivado en lugar de en las integraciones:
+ * la rama del change se elimina después de archivar. Debe existir en los tres
+ * repos con los mismos marcadores.
+ */
+const ACCIONES = [
+  {
+    archivo: ".github/workflows/openspec-archive-on-merge.yml",
+    marcadores: ["Delete the merged feature branch", "git/refs/heads/"],
+  },
+];
+
 /** Normaliza el texto para comparar sin depender de saltos de línea ni sangría. */
 const normalizar = (texto) => texto.replace(/\s+/g, " ").trim();
 
@@ -128,12 +140,31 @@ function main() {
     }
   }
 
+  const accionesIncompletas = [];
+  for (const { archivo, marcadores } of ACCIONES) {
+    const contenido = leer(archivo);
+    if (contenido === null) {
+      accionesIncompletas.push({ archivo, motivo: "archivo inexistente" });
+      continue;
+    }
+    const ausentes = marcadores.filter((marca) => !contenido.includes(marca));
+    if (ausentes.length > 0) {
+      accionesIncompletas.push({
+        archivo,
+        motivo: `sin ${ausentes.join(", ")}`,
+      });
+    } else {
+      correctos.push(archivo);
+    }
+  }
+
   const problemas = [
     ...faltantes.map(({ superficie, motivo }) => `${superficie} — ${motivo}`),
     ...divergentes.map(
       (superficie) => `${superficie} — diverge del bloque canónico`,
     ),
     ...resumenesIncompletos.map(({ archivo, motivo }) => `${archivo} — ${motivo}`),
+    ...accionesIncompletas.map(({ archivo, motivo }) => `${archivo} — ${motivo}`),
   ];
 
   if (problemas.length === 0) {

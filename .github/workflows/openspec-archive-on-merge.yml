@@ -217,3 +217,31 @@ jobs:
 
           git commit -m "chore(openspec): archive $CHANGE_ID"
           git push origin "HEAD:$TARGET_BRANCH"
+      - name: Delete the merged feature branch
+        if: steps.detect.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Una rama de fork no pertenece a este repositorio.
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "The pull request came from $HEAD_REPO; its branch is left untouched."
+            exit 0
+          fi
+
+          if [ -z "$HEAD_BRANCH" ] || [ "$HEAD_BRANCH" = "$BASE_BRANCH" ]; then
+            echo "No branch to delete for this pull request."
+            exit 0
+          fi
+
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$HEAD_BRANCH" >/dev/null 2>&1; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$HEAD_BRANCH"
+            echo "Deleted branch $HEAD_BRANCH."
+          else
+            echo "Branch $HEAD_BRANCH was already deleted."
+          fi

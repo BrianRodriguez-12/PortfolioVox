@@ -87,6 +87,29 @@ el 30 de septiembre de 2026, cuando la política de rama se agregó únicamente 
 Los directorios de integración son ocultos, así que una búsqueda con `grep` o `rg`
 sin `--hidden` los ignora y produce falsos negativos al auditar.
 
+## Regla 4 — La rama del change se elimina al archivarlo
+
+Cuando el pull request de un change se integra a la rama por defecto, la Action
+`.github/workflows/openspec-archive-on-merge.yml` archiva el change y, como **último
+paso**, elimina la rama de origen del pull request. La eliminación va al final del job
+para que una ejecución fallida deje la rama disponible y se pueda reintentar sin tener
+que volver a crearla.
+
+Guardas del paso:
+
+- solo actúa cuando el pull request proviene del propio repositorio; una rama de fork
+  no se toca, porque no pertenece a este repositorio y el token no puede eliminarla;
+- no elimina nada si la rama de origen es la misma que la rama base;
+- si la rama ya no existe, termina sin error, así que es seguro ejecutarlo dos veces.
+
+GitHub también puede eliminar automáticamente la rama de origen al integrar un pull
+request (ajuste `delete_branch_on_merge` del repositorio). Ese ajuste actúa sobre
+cualquier pull request, incluso los que no archivan un change; este proyecto lo deja
+en la Action para que la eliminación quede ligada al archivado del change.
+
+`npm run verificar:reglas` comprueba que el paso `Delete the merged feature branch`
+siga presente en la Action.
+
 ## Superficies obligatorias
 
 Puntos de entrada del workflow de proposal que deben contener el bloque canónico:
